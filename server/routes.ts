@@ -280,6 +280,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Subscription and payment routes
   
+  // Create a payment intent for checkout
+  app.post("/api/create-payment-intent", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { plan, amount, promocode } = req.body;
+      
+      if (!amount || isNaN(parseFloat(amount))) {
+        return res.status(400).json({ message: "Valid amount is required" });
+      }
+      
+      let discountPercent = 0;
+      let promocodeId: number | null = null;
+      
+      // Apply promocode if provided
+      if (promocode) {
+        const promocodeData = await storage.getPromocode(promocode);
+        if (promocodeData) {
+          // Check if user has already used this promocode
+          if (await storage.hasUserUsedPromocode(user.id, promocodeData.id)) {
+            return res.status(400).json({ message: "You have already used this promocode" });
+          }
+          
+          discountPercent = promocodeData.discountPercent;
+          promocodeId = promocodeData.id;
+        }
+      }
+      
+      // Calculate amount in cents
+      const amountInCents = Math.round(parseFloat(amount) * 100);
+      
+      // Find or create a Stripe customer for this user
+      let customer;
+      if (user.stripeCustomerId) {
+        customer = await stripe.customers.retrieve(user.stripeCustomerId);
+        if ((customer as any).deleted) {
+          // Customer was deleted, create a new one
+          customer = await stripe.customers.create({
+            email: user.email,
+            name: user.displayName || user.username,
+            metadata: {
+              userId: user.id.toString()
+            }
+          });
+          
+          // Update the user with the new customer ID
+          await storage.updateUserSubscription(user.id, {
+            isPremium: user.isPremium,
+            stripeCustomerId: customer.id
+          });
+        }
+      } else {
+        // Create a new customer
+        customer = await stripe.customers.create({
+          email: user.email,
+          name: user.displayName || user.username,
+          metadata: {
+            userId: user.id.toString()
+          }
+        });
+        
+        // Update the user with the new customer ID
+        await storage.updateUserSubscription(user.id, {
+          isPremium: user.isPremium,
+          stripeCustomerId: customer.id
+        });
+      }
+      
+      // Create a payment intent
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amountInCents,
+        currency: "usd",
+        customer: customer.id,
+        description: `PromptPal ${plan || 'Premium'} Subscription`,
+        metadata: {
+          userId: user.id.toString(),
+          plan: plan || 'monthly',
+          promocodeId: promocodeId ? promocodeId.toString() : null
+        }
+      });
+      
+      // Apply the promocode if used
+      if (promocodeId) {
+        await storage.applyPromocodeToUser(user.id, promocodeId);
+        await storage.incrementPromocodeUsage(promocodeId);
+      }
+      
+      // Return client secret for the frontend to complete payment
+      res.json({
+        clientSecret: paymentIntent.client_secret,
+        amount: amountInCents,
+        discountPercent: discountPercent
+      });
+    } catch (error) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+  
   // Apply a promocode
   app.post("/api/promocodes/validate", isAuthenticated, async (req, res) => {
     try {

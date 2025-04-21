@@ -1,242 +1,290 @@
 import { useState } from "react";
-import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
-import { Check, Loader2 } from "lucide-react";
+import { LoaderCircle, Check, X } from "lucide-react";
+import type { ApplyPromocodeData } from "@shared/schema";
 
 export default function SubscriptionForm() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
-  const [activePlan, setActivePlan] = useState<"monthly" | "yearly">("monthly");
+  const [selectedPlan, setSelectedPlan] = useState<"monthly" | "annual">("monthly");
   const [promocode, setPromocode] = useState("");
-  const [discount, setDiscount] = useState(0);
-  const [validPromocode, setValidPromocode] = useState(false);
-  const [isCheckingPromocode, setIsCheckingPromocode] = useState(false);
+  const [discount, setDiscount] = useState<number | null>(null);
+  const [isApplyingCode, setIsApplyingCode] = useState(false);
+  const [isSubscribing, setIsSubscribing] = useState(false);
 
-  const planPrices = {
+  const plans = {
     monthly: {
-      original: 14.99,
-      discounted: 14.99 * (1 - discount / 100)
+      name: "Monthly",
+      price: 9.99,
+      discountedPrice: discount ? 9.99 * (1 - discount / 100) : null,
+      features: [
+        "Unlimited prompt optimizations",
+        "Priority support",
+        "Advanced optimization features",
+        "API access"
+      ]
     },
-    yearly: {
-      original: 149.90,
-      discounted: 149.90 * (1 - discount / 100)
+    annual: {
+      name: "Annual",
+      price: 99.99,
+      discountedPrice: discount ? 99.99 * (1 - discount / 100) : null,
+      features: [
+        "All monthly features",
+        "Save 17% compared to monthly",
+        "Early access to new features",
+        "Downloadable prompt history"
+      ]
     }
   };
 
-  // Handle promocode validation
-  const validatePromocode = async () => {
+  const handleApplyPromocode = async () => {
     if (!promocode.trim()) {
       toast({
-        title: "Please enter a valid promocode",
-        variant: "destructive",
+        title: "Promocode required",
+        description: "Please enter a promocode to apply a discount.",
+        variant: "destructive"
       });
       return;
     }
 
-    setIsCheckingPromocode(true);
+    setIsApplyingCode(true);
+    
     try {
-      const response = await apiRequest("POST", "/api/promocodes/validate", { code: promocode });
-      const data = await response.json();
+      const data: ApplyPromocodeData = { code: promocode };
+      const response = await apiRequest("POST", "/api/promocodes/apply", data);
+      const result = await response.json();
       
       if (response.ok) {
-        setDiscount(data.discountPercent);
-        setValidPromocode(true);
+        setDiscount(result.discountPercentage);
         toast({
           title: "Promocode applied!",
-          description: `You got a ${data.discountPercent}% discount on your subscription.`,
+          description: `You've received a ${result.discountPercentage}% discount.`,
         });
       } else {
-        setValidPromocode(false);
         toast({
           title: "Invalid promocode",
-          description: data.message || "This promocode is invalid or has expired.",
-          variant: "destructive",
+          description: result.message || "The promocode you entered is invalid or expired.",
+          variant: "destructive"
         });
       }
     } catch (error) {
       toast({
-        title: "Error validating promocode",
-        description: "Please try again later.",
-        variant: "destructive",
+        title: "Error",
+        description: "Failed to apply promocode. Please try again.",
+        variant: "destructive"
       });
     } finally {
-      setIsCheckingPromocode(false);
+      setIsApplyingCode(false);
     }
   };
 
-  // Handle subscription creation
   const handleSubscribe = async () => {
-    setIsLoading(true);
+    setIsSubscribing(true);
+    
     try {
-      // Create subscription with the selected plan and promocode
-      const response = await apiRequest("POST", "/api/subscriptions", {
-        plan: activePlan,
-        promocode: validPromocode ? promocode : undefined
+      const plan = selectedPlan === "monthly" ? "monthly" : "annual";
+      const response = await apiRequest("POST", "/api/create-payment-intent", {
+        plan,
+        amount: discount 
+          ? plans[selectedPlan].price * (1 - discount / 100) 
+          : plans[selectedPlan].price,
+        promocode: discount ? promocode : undefined
       });
       
-      const data = await response.json();
+      const result = await response.json();
       
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to create subscription");
+      if (response.ok && result.clientSecret) {
+        // Redirect to checkout page with the client secret
+        window.location.href = `/checkout?client_secret=${result.clientSecret}&plan=${plan}`;
+      } else {
+        toast({
+          title: "Subscription error",
+          description: result.message || "Failed to create subscription. Please try again.",
+          variant: "destructive"
+        });
       }
-      
-      // Set up card payment with Stripe
-      // For this example, we'll just show a success message
+    } catch (error) {
       toast({
-        title: "Subscription initiated",
-        description: "Your subscription has been initiated successfully!",
-      });
-      
-      // In a real implementation, we would use Stripe Elements here
-      // to collect payment details and confirm the payment
-      
-    } catch (error: any) {
-      toast({
-        title: "Subscription failed",
-        description: error.message || "An error occurred while processing your subscription.",
-        variant: "destructive",
+        title: "Error",
+        description: "An unexpected error occurred. Please try again later.",
+        variant: "destructive"
       });
     } finally {
-      setIsLoading(false);
+      setIsSubscribing(false);
     }
   };
+
+  if (user?.isPremium) {
+    return (
+      <div className="max-w-md mx-auto text-center p-6">
+        <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-green-100 mb-4">
+          <Check className="h-6 w-6 text-green-600" />
+        </div>
+        <h3 className="text-2xl font-bold mb-2">You're a Premium Member!</h3>
+        <p className="text-muted-foreground mb-6">
+          You already have access to all premium features. Enjoy unlimited prompt optimizations and all our premium features.
+        </p>
+        <Button asChild>
+          <a href="/dashboard">Go to Dashboard</a>
+        </Button>
+      </div>
+    );
+  }
 
   return (
-    <Card className="w-full max-w-3xl mx-auto">
+    <div className="max-w-3xl mx-auto">
+      <Tabs defaultValue="monthly" className="w-full" onValueChange={(value) => setSelectedPlan(value as "monthly" | "annual")}>
+        <TabsList className="grid w-full grid-cols-2 mb-8">
+          <TabsTrigger value="monthly">Monthly</TabsTrigger>
+          <TabsTrigger value="annual">Annual (Save 17%)</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="monthly" className="space-y-4">
+          <SubscriptionCard 
+            plan={plans.monthly}
+            discount={discount}
+            promocode={promocode}
+            setPromocode={setPromocode}
+            isApplyingCode={isApplyingCode}
+            handleApplyPromocode={handleApplyPromocode}
+            isSubscribing={isSubscribing}
+            handleSubscribe={handleSubscribe}
+          />
+        </TabsContent>
+        
+        <TabsContent value="annual" className="space-y-4">
+          <SubscriptionCard 
+            plan={plans.annual}
+            discount={discount}
+            promocode={promocode}
+            setPromocode={setPromocode}
+            isApplyingCode={isApplyingCode}
+            handleApplyPromocode={handleApplyPromocode}
+            isSubscribing={isSubscribing}
+            handleSubscribe={handleSubscribe}
+          />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+interface PlanType {
+  name: string;
+  price: number;
+  discountedPrice: number | null;
+  features: string[];
+}
+
+interface SubscriptionCardProps {
+  plan: PlanType;
+  discount: number | null;
+  promocode: string;
+  setPromocode: (code: string) => void;
+  isApplyingCode: boolean;
+  handleApplyPromocode: () => void;
+  isSubscribing: boolean;
+  handleSubscribe: () => void;
+}
+
+function SubscriptionCard({
+  plan,
+  discount,
+  promocode,
+  setPromocode,
+  isApplyingCode,
+  handleApplyPromocode,
+  isSubscribing,
+  handleSubscribe
+}: SubscriptionCardProps) {
+  return (
+    <Card className="w-full">
       <CardHeader>
-        <CardTitle className="text-2xl">
-          {user?.isPremium 
-            ? "Manage Your Subscription" 
-            : "Upgrade to PromptPal Pro"}
-        </CardTitle>
+        <CardTitle>{plan.name} Premium Plan</CardTitle>
         <CardDescription>
-          {user?.isPremium 
-            ? "Your current subscription status and options" 
-            : "Unlock unlimited prompt optimizations and premium features"}
+          Get unlimited access to PromptPal's premium features
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="monthly" className="w-full" onValueChange={(val) => setActivePlan(val as "monthly" | "yearly")}>
-          <TabsList className="grid w-full grid-cols-2 mb-8">
-            <TabsTrigger value="monthly">Monthly</TabsTrigger>
-            <TabsTrigger value="yearly">Yearly (Save 16%)</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="monthly" className="space-y-4">
-            <div className="p-6 border rounded-lg bg-card">
-              <h3 className="text-xl font-bold">Pro Monthly</h3>
-              <div className="flex items-baseline mt-2">
-                {discount > 0 && (
-                  <span className="text-xl line-through text-muted-foreground mr-2">
-                    ${planPrices.monthly.original}
-                  </span>
-                )}
-                <span className="text-3xl font-bold">
-                  ${planPrices.monthly.discounted.toFixed(2)}
-                </span>
-                <span className="text-muted-foreground ml-1">/month</span>
-              </div>
-              <ul className="mt-4 space-y-2">
-                <li className="flex items-center">
-                  <Check className="h-5 w-5 text-green-500 mr-2" />
-                  <span>Unlimited prompt optimizations</span>
-                </li>
-                <li className="flex items-center">
-                  <Check className="h-5 w-5 text-green-500 mr-2" />
-                  <span>Advanced customization options</span>
-                </li>
-                <li className="flex items-center">
-                  <Check className="h-5 w-5 text-green-500 mr-2" />
-                  <span>Priority support</span>
-                </li>
-              </ul>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="yearly" className="space-y-4">
-            <div className="p-6 border rounded-lg bg-card">
-              <h3 className="text-xl font-bold">Pro Yearly</h3>
-              <div className="flex items-baseline mt-2">
-                {discount > 0 && (
-                  <span className="text-xl line-through text-muted-foreground mr-2">
-                    ${planPrices.yearly.original}
-                  </span>
-                )}
-                <span className="text-3xl font-bold">
-                  ${planPrices.yearly.discounted.toFixed(2)}
-                </span>
-                <span className="text-muted-foreground ml-1">/year</span>
-              </div>
-              <ul className="mt-4 space-y-2">
-                <li className="flex items-center">
-                  <Check className="h-5 w-5 text-green-500 mr-2" />
-                  <span>Unlimited prompt optimizations</span>
-                </li>
-                <li className="flex items-center">
-                  <Check className="h-5 w-5 text-green-500 mr-2" />
-                  <span>Advanced customization options</span>
-                </li>
-                <li className="flex items-center">
-                  <Check className="h-5 w-5 text-green-500 mr-2" />
-                  <span>Priority support</span>
-                </li>
-                <li className="flex items-center">
-                  <Check className="h-5 w-5 text-green-500 mr-2" />
-                  <span>Save 16% compared to monthly</span>
-                </li>
-              </ul>
-            </div>
-          </TabsContent>
-        </Tabs>
+      <CardContent className="space-y-6">
+        <div>
+          <div className="flex items-baseline">
+            {discount ? (
+              <>
+                <span className="text-3xl font-bold">${plan.discountedPrice?.toFixed(2)}</span>
+                <span className="ml-2 text-xl text-muted-foreground line-through">${plan.price.toFixed(2)}</span>
+                <span className="ml-2 text-sm font-medium text-green-500">Save {discount}%</span>
+              </>
+            ) : (
+              <span className="text-3xl font-bold">${plan.price.toFixed(2)}</span>
+            )}
+            <span className="text-muted-foreground ml-2">/{plan.name.toLowerCase()}</span>
+          </div>
+        </div>
         
-        {/* Promocode section */}
-        <div className="mt-8">
-          <h3 className="text-lg font-medium mb-2">Have a promocode?</h3>
-          <div className="flex space-x-2">
-            <div className="flex-1">
+        <div>
+          <h4 className="text-sm font-medium mb-3">What's included:</h4>
+          <ul className="space-y-2">
+            {plan.features.map((feature, i) => (
+              <li key={i} className="flex items-center">
+                <Check className="h-4 w-4 mr-2 text-green-500" />
+                <span>{feature}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        
+        <div className="space-y-3">
+          <div className="grid grid-cols-4 gap-3">
+            <div className="col-span-3">
+              <Label htmlFor="promocode">Promocode</Label>
               <Input 
-                placeholder="Enter your promocode" 
+                id="promocode" 
+                placeholder="Enter promocode" 
                 value={promocode}
                 onChange={(e) => setPromocode(e.target.value)}
-                disabled={isCheckingPromocode || validPromocode}
-                className={validPromocode ? "border-green-500" : ""}
               />
             </div>
-            <Button 
-              onClick={validatePromocode} 
-              variant={validPromocode ? "outline" : "default"}
-              disabled={isCheckingPromocode || validPromocode}
-            >
-              {isCheckingPromocode ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : validPromocode ? (
-                <Check className="h-4 w-4 mr-2" />
-              ) : null}
-              {validPromocode ? "Applied" : "Apply"}
-            </Button>
+            <div className="flex items-end">
+              <Button 
+                variant="outline" 
+                className="w-full" 
+                onClick={handleApplyPromocode}
+                disabled={isApplyingCode}
+              >
+                {isApplyingCode ? (
+                  <LoaderCircle className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  "Apply"
+                )}
+              </Button>
+            </div>
           </div>
-          {validPromocode && (
-            <p className="text-sm text-green-600 mt-1">
-              {`${discount}% discount applied!`}
-            </p>
-          )}
         </div>
       </CardContent>
-      <CardFooter>
+      <Separator />
+      <CardFooter className="pt-6">
         <Button 
-          onClick={handleSubscribe} 
-          className="w-full"
-          disabled={isLoading}
+          className="w-full" 
+          size="lg"
+          onClick={handleSubscribe}
+          disabled={isSubscribing}
         >
-          {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          {user?.isPremium ? "Update Subscription" : "Subscribe Now"}
+          {isSubscribing ? (
+            <>
+              <LoaderCircle className="h-4 w-4 mr-2 animate-spin" />
+              Processing...
+            </>
+          ) : (
+            <>Subscribe Now</>
+          )}
         </Button>
       </CardFooter>
     </Card>
