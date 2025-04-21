@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -13,6 +13,11 @@ export const users = pgTable("users", {
   providerId: text("provider_id"),
   promptsUsed: integer("prompts_used").default(0).notNull(),
   isPremium: boolean("is_premium").default(false).notNull(),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  subscriptionStatus: text("subscription_status").default("inactive").notNull(),
+  // Track when the promptsUsed counter was last reset
+  lastResetDate: timestamp("last_reset_date").defaultNow().notNull(),
 });
 
 export const prompts = pgTable("prompts", {
@@ -23,6 +28,31 @@ export const prompts = pgTable("prompts", {
   audience: text("audience"),
   focusAreas: text("focus_areas"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const promocodes = pgTable("promocodes", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(),
+  description: text("description"),
+  discountPercent: integer("discount_percent").notNull(),
+  maxUses: integer("max_uses").default(0),
+  usedCount: integer("used_count").default(0).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  stripePromotionId: text("stripe_promotion_id"),
+});
+
+export const userPromocodes = pgTable("user_promocodes", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  promocodeId: integer("promocode_id").notNull(),
+  usedAt: timestamp("used_at").defaultNow().notNull(),
+  // Each user can use a specific promocode only once
+}, (table) => {
+  return {
+    userPromoUnique: uniqueIndex("user_promo_unique_idx").on(table.userId, table.promocodeId),
+  };
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
@@ -48,6 +78,25 @@ export const insertPromptSchema = createInsertSchema(prompts).pick({
   focusAreas: true,
 });
 
+export const promocodeSchema = createInsertSchema(promocodes).pick({
+  code: true,
+  description: true,
+  discountPercent: true,
+  maxUses: true,
+  isActive: true,
+  expiresAt: true,
+  stripePromotionId: true,
+});
+
+export const applyPromocodeSchema = z.object({
+  code: z.string().min(1, "Please enter a promocode"),
+});
+
+export const subscriptionSchema = z.object({
+  plan: z.enum(["monthly", "yearly"]),
+  promocode: z.string().optional(),
+});
+
 export const optimizePromptSchema = z.object({
   originalPrompt: z.string().min(1, "Please enter a prompt"),
   audience: z.string().optional(),
@@ -60,3 +109,7 @@ export type User = typeof users.$inferSelect;
 export type InsertPrompt = z.infer<typeof insertPromptSchema>;
 export type Prompt = typeof prompts.$inferSelect;
 export type OptimizePromptData = z.infer<typeof optimizePromptSchema>;
+export type Promocode = typeof promocodes.$inferSelect;
+export type InsertPromocode = z.infer<typeof promocodeSchema>;
+export type ApplyPromocodeData = z.infer<typeof applyPromocodeSchema>;
+export type SubscriptionData = z.infer<typeof subscriptionSchema>;
