@@ -1,5 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
-import Layout from "@/components/layout/Layout";
+import Layout from "../components/layout/Layout";
 import SubscriptionForm from "@/components/subscription/SubscriptionForm";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";

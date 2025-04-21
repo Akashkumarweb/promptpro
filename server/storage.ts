@@ -291,6 +291,23 @@ export class MemStorage implements IStorage {
     this.userIdCounter = 1;
     this.promptIdCounter = 1;
     this.promocodeIdCounter = 1;
+
+    // Add sample promocodes for testing
+    this.createPromocode({
+      code: "WELCOME25",
+      discountPercent: 25,
+      description: "25% off for new users",
+      maxUses: 100,
+      expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 90 days from now
+    });
+    
+    this.createPromocode({
+      code: "SUMMER2025",
+      discountPercent: 30,
+      description: "Summer special 30% discount",
+      maxUses: 50,
+      expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000), // 60 days from now
+    });
   }
 
   async getUser(id: number): Promise<User | undefined> {

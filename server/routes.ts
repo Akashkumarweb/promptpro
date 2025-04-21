@@ -378,6 +378,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Apply a promocode
+  app.post("/api/promocodes/apply", isAuthenticated, async (req, res) => {
+    try {
+      const { code } = applyPromocodeSchema.parse(req.body);
+      
+      // Check if this promocode exists and is valid
+      const promocode = await storage.getPromocode(code);
+      
+      if (!promocode) {
+        return res.status(404).json({ 
+          message: "Invalid or expired promocode"
+        });
+      }
+      
+      // Check if user has already used this promocode
+      const user = req.user as any;
+      if (await storage.hasUserUsedPromocode(user.id, promocode.id)) {
+        return res.status(400).json({ 
+          message: "You have already used this promocode"
+        });
+      }
+      
+      // Return the promocode info with discount percentage
+      res.json({
+        code: promocode.code,
+        discountPercentage: promocode.discountPercent,
+        description: promocode.description
+      });
+    } catch (error) {
+      res.status(400).json({ message: (error as Error).message });
+    }
+  });
+  
+  // Validate a promocode
   app.post("/api/promocodes/validate", isAuthenticated, async (req, res) => {
     try {
       const { code } = applyPromocodeSchema.parse(req.body);

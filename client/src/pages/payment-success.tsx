@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { CheckCircle } from "lucide-react";
-import Layout from "@/components/layout/Layout";
+import Layout from "../components/layout/Layout";
 
 export default function PaymentSuccess() {
   const { user } = useAuth();
