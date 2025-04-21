@@ -11,7 +11,7 @@ import {
   userPromocodes
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, gt, lt, isNull, ne } from "drizzle-orm";
+import { eq, and, gt, lt, isNull, sql } from "drizzle-orm";
 
 export interface IStorage {
   // User management
@@ -77,7 +77,9 @@ export class DatabaseStorage implements IStorage {
         promptsUsed: 0,
         isPremium: false,
         lastResetDate: new Date(),
-        subscriptionStatus: "inactive"
+        subscriptionStatus: "inactive",
+        stripeCustomerId: null,
+        stripeSubscriptionId: null
       })
       .returning();
     return user;
@@ -179,8 +181,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deletePrompt(id: number): Promise<boolean> {
-    const result = await db.delete(prompts).where(eq(prompts.id, id));
-    return result.count > 0;
+    await db.delete(prompts).where(eq(prompts.id, id));
+    return true;
   }
   
   async getPromocode(code: string): Promise<Promocode | undefined> {
@@ -191,14 +193,8 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(promocodes.code, code),
           eq(promocodes.isActive, true),
-          or(
-            isNull(promocodes.expiresAt),
-            gt(promocodes.expiresAt, new Date())
-          ),
-          or(
-            eq(promocodes.maxUses, 0), // 0 means unlimited uses
-            gt(promocodes.maxUses, promocodes.usedCount)
-          )
+          sql`(${promocodes.expiresAt} IS NULL OR ${promocodes.expiresAt} > ${new Date()})`,
+          sql`(${promocodes.maxUses} = 0 OR ${promocodes.maxUses} > ${promocodes.usedCount})`
         )
       );
     return promocode;
@@ -321,7 +317,9 @@ export class MemStorage implements IStorage {
       promptsUsed: 0, 
       isPremium: false,
       subscriptionStatus: "inactive",
-      lastResetDate: new Date()
+      lastResetDate: new Date(),
+      stripeCustomerId: null,
+      stripeSubscriptionId: null
     };
     this.users.set(id, user);
     return user;
@@ -510,8 +508,5 @@ export class MemStorage implements IStorage {
   }
 }
 
-// Uncomment below to use the database storage
-// export const storage = new DatabaseStorage();
-
-// For now, use the memory storage
-export const storage = new MemStorage();
+// Use database storage since we have PostgreSQL available
+export const storage = new DatabaseStorage();
