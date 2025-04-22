@@ -1,10 +1,14 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Loader } from "@/components/ui/loader";
 import { Badge } from "@/components/ui/badge";
-import { CopyIcon, CheckIcon } from "lucide-react";
+import { 
+  Copy, Check, ThumbsUp, ThumbsDown, AlertTriangle, 
+  Sparkles, Lightbulb, ArrowRight, Wand2, Bot 
+} from "lucide-react";
 import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 import { Prompt } from "@shared/schema";
 
 interface OptimizedPromptResult extends Partial<Prompt> {
@@ -15,32 +19,59 @@ interface OptimizedPromptResult extends Partial<Prompt> {
 interface OptimizedPromptProps {
   result?: OptimizedPromptResult;
   isLoading: boolean;
+  onCopy?: (text: string, key: string) => void;
+  copyStatus?: Record<string, boolean>;
 }
 
-export default function OptimizedPrompt({ result, isLoading }: OptimizedPromptProps) {
+export default function OptimizedPrompt({ 
+  result, 
+  isLoading, 
+  onCopy,
+  copyStatus = {}
+}: OptimizedPromptProps) {
   const { toast } = useToast();
-  const [copied, setCopied] = useState(false);
+  const [feedbackGiven, setFeedbackGiven] = useState<'positive' | 'negative' | null>(null);
+  const [localCopyStatus, setLocalCopyStatus] = useState<Record<string, boolean>>({});
+  
+  const effectiveCopyStatus = onCopy ? copyStatus : localCopyStatus;
 
-  const copyToClipboard = () => {
-    if (!result?.optimizedPrompt) return;
+  const copyToClipboard = (text: string, key: string = 'main') => {
+    if (!text) return;
     
-    navigator.clipboard.writeText(result.optimizedPrompt)
+    if (onCopy) {
+      onCopy(text, key);
+      return;
+    }
+    
+    navigator.clipboard.writeText(text)
       .then(() => {
-        setCopied(true);
+        setLocalCopyStatus(prev => ({ ...prev, [key]: true }));
         toast({
           title: "Copied!",
-          description: "Prompt copied to clipboard",
+          description: "Text copied to clipboard",
         });
         
-        setTimeout(() => setCopied(false), 2000);
+        setTimeout(() => {
+          setLocalCopyStatus(prev => ({ ...prev, [key]: false }));
+        }, 2000);
       })
-      .catch(err => {
+      .catch(() => {
         toast({
           title: "Error",
-          description: "Failed to copy prompt",
+          description: "Failed to copy text",
           variant: "destructive",
         });
       });
+  };
+  
+  const handleFeedback = (type: 'positive' | 'negative') => {
+    setFeedbackGiven(type);
+    toast({
+      title: type === 'positive' ? "Thank you!" : "We'll do better",
+      description: type === 'positive' 
+        ? "Thanks for your positive feedback"
+        : "Thank you for your feedback. We'll work to improve our optimizations",
+    });
   };
 
   if (isLoading) {
