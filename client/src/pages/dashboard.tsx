@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 
 export default function Dashboard() {
   const { user, isLoading: authLoading } = useAuth();
-  const { data: prompts, isLoading: promptsLoading } = usePromptHistory();
+  const { data: prompts = [], isLoading: promptsLoading } = usePromptHistory();
   const [, navigate] = useLocation();
 
   useEffect(() => {
@@ -209,7 +209,7 @@ export default function Dashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <PromptHistory prompts={prompts || []} isLoading={promptsLoading} />
+                <PromptHistory prompts={prompts} isLoading={promptsLoading} />
               </CardContent>
             </Card>
           </TabsContent>
