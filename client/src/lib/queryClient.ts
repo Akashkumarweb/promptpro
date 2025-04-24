@@ -1,5 +1,7 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+const BASE_URL = "https://promptpro.onrender.com";
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -7,44 +9,37 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-// export async function apiRequest(
-//   method: string,
-//   url: string,
-//   data?: unknown | undefined,
-// ): Promise<Response> {
-//   const res = await fetch(url, {
-//     method,
-//     headers: data ? { "Content-Type": "application/json" } : {},
-//     body: data ? JSON.stringify(data) : undefined,
-//     credentials: "include",
-//   });
-
-//   await throwIfResNotOk(res);
-//   return res;
-// }
-
 export async function apiRequest(
   method: string,
-  path: string,
-  body?: any
+  url: string,
+  data?: unknown | undefined,
 ): Promise<Response> {
-  return fetch(`https://promptpro.onrender.com${path}`, {
+  const fullUrl = url.startsWith("http") ? url : `${BASE_URL}${url}`;
+
+  const res = await fetch(fullUrl, {
     method,
-    headers: {
-      "Content-Type": "application/json",
-    },
-    credentials: "include", // ✅ Add this line
-    body: body ? JSON.stringify(body) : undefined,
+    headers: data ? { "Content-Type": "application/json" } : {},
+    body: data ? JSON.stringify(data) : undefined,
+    credentials: "include", // ✅ important for session cookies
   });
+
+  await throwIfResNotOk(res);
+  return res;
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
+
 export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey[0] as string, {
+    const fullUrl =
+      typeof queryKey[0] === "string" && queryKey[0].startsWith("http")
+        ? (queryKey[0] as string)
+        : `${BASE_URL}${queryKey[0]}`;
+
+    const res = await fetch(fullUrl, {
       credentials: "include",
     });
 
