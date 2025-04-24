@@ -16,14 +16,14 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     secure: true,
-    sameSite: "lax",
+    sameSite: "none",
     maxAge: 24 * 60 * 60 * 1000
   }
 }));
 
 // ➕ CORS must allow credentials
 app.use(cors({
-  origin: "https://promptpro-lake.vercel.app", // ✅ No trailing slash!
+  origin: "https://promptpro.onrender.com/", 
   credentials: true,
 }));
 
