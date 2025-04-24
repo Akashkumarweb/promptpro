@@ -27,7 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const checkAuthStatus = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch("/api/auth/me", {
+        const response = await fetch("https://promptpro.onrender.com/api/auth/me", {
           credentials: "include",
         });
 

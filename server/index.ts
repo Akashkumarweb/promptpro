@@ -9,7 +9,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// ➕ Add session support (critical for Passport.js)
+
 app.use(session({
   secret: process.env.SESSION_SECRET || "prompt-pal-secret",
   resave: false,
@@ -21,7 +21,8 @@ app.use(session({
   }
 }));
 
-// ➕ CORS must allow credentials
+app.set("trust proxy", 1); 
+
 app.use(cors({
   origin: "https://promptpro.onrender.com", 
   credentials: true,
