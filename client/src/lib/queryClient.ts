@@ -7,20 +7,35 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+// export async function apiRequest(
+//   method: string,
+//   url: string,
+//   data?: unknown | undefined,
+// ): Promise<Response> {
+//   const res = await fetch(url, {
+//     method,
+//     headers: data ? { "Content-Type": "application/json" } : {},
+//     body: data ? JSON.stringify(data) : undefined,
+//     credentials: "include",
+//   });
+
+//   await throwIfResNotOk(res);
+//   return res;
+// }
+
 export async function apiRequest(
   method: string,
-  url: string,
-  data?: unknown | undefined,
+  path: string,
+  body?: any
 ): Promise<Response> {
-  const res = await fetch(url, {
+  return fetch(`https://promptpro.onrender.com${path}`, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include", // ✅ Add this line
+    body: body ? JSON.stringify(body) : undefined,
   });
-
-  await throwIfResNotOk(res);
-  return res;
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
