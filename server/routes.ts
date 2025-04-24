@@ -22,9 +22,8 @@ if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("Missing required environment variable: STRIPE_SECRET_KEY");
 }
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2023-10-16",
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
 
 // Define subscription plan pricing
 const SUBSCRIPTION_PLANS = {
@@ -130,34 +129,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.status(201).json(userWithoutPassword);
     } catch (error) {
-      res.status(400).json({ message: error.message });
-    }
+  if (error instanceof Error) {
+    res.status(400).json({ message: error.message });
+  } else {
+    res.status(400).json({ message: "An unknown error occurred" });
+  }
+}
+
   });
 
   app.post("/api/auth/login", (req, res, next) => {
     try {
       loginUserSchema.parse(req.body);
-      
-      passport.authenticate("local", (err, user, info) => {
-        if (err) {
-          return next(err);
-        }
-        if (!user) {
-          return res.status(401).json({ message: info.message });
-        }
+      passport.authenticate("local", (err: any, user: any, info: { message?: string }) => {
+        if (err) return next(err);
+        if (!user) return res.status(401).json({ message: info.message });
         req.logIn(user, (err) => {
-          if (err) {
-            return next(err);
-          }
-          
-          // Remove password from response
+          if (err) return next(err);
           const { password, ...userWithoutPassword } = user;
-          
-          return res.json(userWithoutPassword);
+          res.json(userWithoutPassword);
         });
       })(req, res, next);
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 
@@ -219,7 +213,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         improvements: optimizedResult.improvements
       });
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 
@@ -229,7 +223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const prompts = await storage.getUserPrompts(user.id);
       res.json(prompts);
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 
@@ -251,7 +245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(prompt);
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 
@@ -274,7 +268,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.deletePrompt(promptId);
       res.json({ message: "Prompt deleted successfully" });
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 
@@ -373,7 +367,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         discountPercent: discountPercent
       });
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: error instanceof Error ? error.message : "Unknown error" });
     }
   });
   
@@ -439,7 +433,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: promocode.description
       });
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: error instanceof Error ? error.message : "Unknown error" });
     }
   });
   
@@ -541,84 +535,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
         discountPercent: discountPercent
       });
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: error instanceof Error ? error.message : "Unknown error" });
     }
   });
   
   // Webhook endpoint for Stripe events
-  app.post("/api/webhooks/stripe", async (req, res) => {
-    const sig = req.headers["stripe-signature"];
-    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-    
-    if (!sig || !endpointSecret) {
-      return res.status(400).json({ message: "Missing signature or webhook secret" });
-    }
-    
-    let event;
-    
-    try {
-      event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
-    } catch (err) {
-      return res.status(400).json({ message: `Webhook Error: ${err.message}` });
-    }
-    
-    // Handle different webhook events
-    switch (event.type) {
-      case "payment_intent.succeeded": {
-        const paymentIntent = event.data.object;
-        
-        // Get the user ID from the payment intent metadata
-        const userId = parseInt(paymentIntent.metadata.userId);
-        const plan = paymentIntent.metadata.plan;
-        
-        if (userId && plan) {
-          // Update the user's subscription status
-          await storage.updateUserSubscription(userId, {
-            isPremium: true,
-            subscriptionStatus: "active"
-          });
-        }
-        break;
+ app.post("/api/webhooks/stripe", async (req, res) => {
+  const sig = req.headers["stripe-signature"];
+  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!sig || !endpointSecret) {
+    return res.status(400).json({ message: "Missing signature or webhook secret" });
+  }
+
+  let event: Stripe.Event | null = null;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown webhook error";
+    return res.status(400).json({ message });
+  }
+
+  if (!event) {
+    return res.status(400).json({ message: "Invalid event payload" });
+  }
+
+  // ✅ Now TypeScript knows event is NOT undefined or null
+  switch (event.type) {
+    case "payment_intent.succeeded": {
+      const paymentIntent = event.data.object as Stripe.PaymentIntent;
+      const userId = parseInt(paymentIntent.metadata.userId);
+      const plan = paymentIntent.metadata.plan;
+
+      if (userId && plan) {
+        await storage.updateUserSubscription(userId, {
+          isPremium: true,
+          subscriptionStatus: "active",
+        });
       }
-      
-      case "subscription.created":
-      case "subscription.updated": {
-        const subscription = event.data.object;
-        
-        // Find the user by customer ID
-        const user = await storage.getUserByStripeCustomerId(subscription.customer);
-        
-        if (user) {
-          // Update the user's subscription status
-          await storage.updateUserSubscription(user.id, {
-            isPremium: subscription.status === "active",
-            stripeSubscriptionId: subscription.id,
-            subscriptionStatus: subscription.status
-          });
-        }
-        break;
-      }
-      
-      case "subscription.deleted": {
-        const subscription = event.data.object;
-        
-        // Find the user by customer ID
-        const user = await storage.getUserByStripeCustomerId(subscription.customer);
-        
-        if (user) {
-          // Update the user's subscription status
-          await storage.updateUserSubscription(user.id, {
-            isPremium: false,
-            subscriptionStatus: "inactive"
-          });
-        }
-        break;
-      }
+      break;
     }
-    
-    // Return a 200 to acknowledge receipt of the webhook
-    res.json({ received: true });
-  });
+
+    case "customer.subscription.created":
+    case "customer.subscription.updated": {
+      const subscription = event.data.object as Stripe.Subscription;
+      const user = await storage.getUserByStripeCustomerId(subscription.customer as string);
+
+      if (user) {
+        await storage.updateUserSubscription(user.id, {
+          isPremium: subscription.status === "active",
+          stripeSubscriptionId: subscription.id,
+          subscriptionStatus: subscription.status,
+        });
+      }
+      break;
+    }
+
+    case "customer.subscription.deleted": {
+      const subscription = event.data.object as Stripe.Subscription;
+      const user = await storage.getUserByStripeCustomerId(subscription.customer as string);
+
+      if (user) {
+        await storage.updateUserSubscription(user.id, {
+          isPremium: false,
+          subscriptionStatus: "inactive",
+        });
+      }
+      break;
+    }
+
+    default:
+      console.log(`Unhandled event type: ${event.type}`);
+  }
+
+  res.json({ received: true });
+});
+
 
   // Admin routes for promocode management (would need additional admin-level auth)
   app.post("/api/admin/promocodes", isAuthenticated, async (req, res) => {
@@ -643,7 +636,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.status(201).json(newPromocode);
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 

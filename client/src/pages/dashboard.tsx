@@ -8,37 +8,50 @@ import PromptForm from "@/components/prompt/PromptForm";
 import PromptHistory from "@/components/prompt/PromptHistory";
 import { PageLoader } from "@/components/ui/loader";
 import { Progress } from "@/components/ui/progress";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { AlertCircle, ChevronRight, Crown, History, Sparkles, Zap, LineChart, Repeat, Settings } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Card, CardContent, CardFooter, CardHeader,
+  CardTitle, CardDescription,
+} from "@/components/ui/card";
+import {
+  AlertCircle, ChevronRight, Crown, History,
+  Sparkles, Zap, LineChart, Repeat, Settings,
+} from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 
 export default function Dashboard() {
+  const [activeTab, setActiveTab] = useState("optimize");
+
   const { user, isLoading: authLoading } = useAuth();
-  const { data: prompts = [], isLoading: promptsLoading } = usePromptHistory();
+  const { data: rawPrompts = [], isLoading: promptsLoading } = usePromptHistory();
+
+  const prompts = (rawPrompts || []) as {
+    id: number;
+    userId: number;
+    originalPrompt: string;
+    optimizedPrompt: string;
+    audience: string | null;
+    focusAreas: string | null;
+    createdAt: Date;
+  }[];
+
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    // Redirect to login if not authenticated
+
     if (!authLoading && !user) {
       navigate("/login");
     }
+
   }, [user, authLoading, navigate]);
 
-  if (authLoading) {
-    return <PageLoader />;
-  }
-
-  if (!user) {
-    return null; // Will redirect to login
-  }
+  if (authLoading) return <PageLoader />;
+  if (!user) return null;
 
   const promptsUsed = user.promptsUsed || 0;
   const promptLimit = user.isPremium ? 200 : 10;
   const usagePercentage = (promptsUsed / promptLimit) * 100;
-
-  const [activeTab, setActiveTab] = useState("optimize");
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
@@ -53,7 +66,7 @@ export default function Dashboard() {
               Optimize your prompts for better AI interactions
             </p>
           </div>
-          
+
           <div className="mt-4 md:mt-0 flex items-center">
             <div className="flex items-center mr-4 bg-white dark:bg-slate-800 shadow-sm rounded-lg p-2 border border-slate-200 dark:border-slate-700">
               <div className="p-1.5 rounded-md bg-indigo-100 dark:bg-indigo-900 mr-2">
@@ -70,7 +83,7 @@ export default function Dashboard() {
                 </p>
               </div>
             </div>
-            
+
             {!user.isPremium && (
               <Button size="sm" asChild className="bg-gradient-to-r from-indigo-600 to-purple-600">
                 <a href="/pricing">Upgrade Now</a>
@@ -78,7 +91,7 @@ export default function Dashboard() {
             )}
           </div>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card>
             <CardHeader className="pb-2">
@@ -93,9 +106,7 @@ export default function Dashboard() {
               <div className="space-y-3">
                 <Progress value={usagePercentage} className="h-2" />
                 <div className="flex justify-between text-sm">
-                  <p className="font-medium">
-                    {promptsUsed} / {promptLimit}
-                  </p>
+                  <p className="font-medium">{promptsUsed} / {promptLimit}</p>
                   <p className="text-slate-600 dark:text-slate-400">
                     {Math.floor(usagePercentage)}% used
                   </p>
@@ -116,7 +127,7 @@ export default function Dashboard() {
               </CardFooter>
             )}
           </Card>
-          
+
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center">
@@ -127,9 +138,7 @@ export default function Dashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">
-                {prompts?.length || 0}
-              </div>
+              <div className="text-3xl font-bold">{prompts?.length || 0}</div>
               <p className="text-sm text-slate-600 dark:text-slate-400">
                 Total optimized prompts
               </p>
@@ -140,7 +149,7 @@ export default function Dashboard() {
               </Button>
             </CardFooter>
           </Card>
-          
+
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center">
@@ -160,7 +169,7 @@ export default function Dashboard() {
                     Current plan
                   </p>
                 </div>
-                
+
                 {!user.isPremium && (
                   <Button size="sm" asChild className="ml-auto">
                     <a href="/pricing">Upgrade</a>
@@ -170,12 +179,14 @@ export default function Dashboard() {
             </CardContent>
             <CardFooter>
               <Button variant="ghost" size="sm" className="text-xs w-full" asChild>
-                <a href="/settings">Account Settings <ChevronRight className="h-3 w-3 ml-1" /></a>
+                <a href="/settings">
+                  Account Settings <ChevronRight className="h-3 w-3 ml-1" />
+                </a>
               </Button>
             </CardFooter>
           </Card>
         </div>
-        
+
         <Tabs defaultValue="optimize" value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-2 md:w-auto">
             <TabsTrigger value="optimize" className="flex items-center gap-2">
@@ -185,7 +196,7 @@ export default function Dashboard() {
               <History className="h-4 w-4" /> Prompt History
             </TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="optimize" className="space-y-6">
             <Card>
               <CardHeader>
@@ -199,7 +210,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           </TabsContent>
-          
+
           <TabsContent value="history" className="space-y-4">
             <Card>
               <CardHeader>
@@ -214,7 +225,6 @@ export default function Dashboard() {
             </Card>
           </TabsContent>
         </Tabs>
-        
       </main>
       <Footer />
     </div>

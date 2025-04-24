@@ -13,10 +13,10 @@ import {
 import { truncateText, formatDate } from "@/lib/utils";
 import { Eye, Trash2 } from "lucide-react";
 import { Loader } from "@/components/ui/loader";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
   DialogTitle,
   DialogTrigger,
   DialogClose
@@ -42,7 +42,7 @@ interface PromptHistoryProps {
 export default function PromptHistory({ prompts, isLoading }: PromptHistoryProps) {
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
   const [promptToDelete, setPromptToDelete] = useState<number | null>(null);
-  
+
   const deleteMutation = useDeletePrompt();
 
   const handleDelete = (id: number) => {
@@ -172,7 +172,7 @@ export default function PromptHistory({ prompts, isLoading }: PromptHistoryProps
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction 
+                          <AlertDialogAction
                             onClick={() => handleDelete(prompt.id)}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                           >
