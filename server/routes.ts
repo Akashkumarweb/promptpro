@@ -103,6 +103,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (req.isAuthenticated()) {
       return next();
     }
+    console.log("Session:", req.session);
+console.log("User:", req.user);
+console.log("isAuthenticated:", req.isAuthenticated());
+
     res.status(401).json({ message: "Not authenticated" });
   };
 
@@ -641,6 +645,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(400).json({ message: error instanceof Error ? error.message : "Unknown error" });
     }
   });
+  
 
   const httpServer = createServer(app);
 

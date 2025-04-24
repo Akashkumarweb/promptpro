@@ -54,7 +54,7 @@ app.use((req, res, next) => {
       log(logLine);
     }
   });
-
+  console.log("Origin:", req.headers.origin);
   next();
 });
 
