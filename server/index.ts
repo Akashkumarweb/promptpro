@@ -23,7 +23,7 @@ app.use(session({
 
 // ➕ CORS must allow credentials
 app.use(cors({
-  origin: "https://promptpro.onrender.com/", 
+  origin: "https://promptpro.onrender.com", 
   credentials: true,
 }));
 
