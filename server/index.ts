@@ -101,7 +101,7 @@ app.use(session({
 
 // ➕ CORS must allow credentials
 app.use(cors({
-  origin: "https://promptpro-lake.vercel.app", // ✅ No trailing slash!
+  origin: "https://promptpro.onrender.com/", // ✅ No trailing slash!
   credentials: true,
 }));
 
