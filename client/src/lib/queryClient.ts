@@ -1,4 +1,4 @@
-import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { QueryClient, QueryFunctionContext } from "@tanstack/react-query";
 
 const BASE_URL = "https://promptpro.onrender.com";
 
@@ -12,7 +12,7 @@ async function throwIfResNotOk(res: Response) {
 export async function apiRequest(
   method: string,
   url: string,
-  data?: unknown | undefined,
+  data?: unknown
 ): Promise<Response> {
   const fullUrl = url.startsWith("http") ? url : `${BASE_URL}${url}`;
 
@@ -20,7 +20,7 @@ export async function apiRequest(
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
-    credentials: "include", 
+    credentials: "include",
   });
 
   await throwIfResNotOk(res);
@@ -29,34 +29,34 @@ export async function apiRequest(
 
 type UnauthorizedBehavior = "returnNull" | "throw";
 
-export const getQueryFn: <T>(options: {
-  on401: UnauthorizedBehavior;
-}) => QueryFunction<T> =
-  ({ on401: unauthorizedBehavior }) =>
-  async ({ queryKey }) => {
-    const fullUrl =
-      typeof queryKey[0] === "string" && queryKey[0].startsWith("http")
-        ? (queryKey[0] as string)
-        : `${BASE_URL}${queryKey[0]}`;
+export function getQueryFn<T>({ on401 }: { on401: UnauthorizedBehavior }) {
+  return async (context: QueryFunctionContext): Promise<T> => {
+    const key = context.queryKey[0];
+    if (typeof key !== "string") {
+      throw new Error("Invalid query key");
+    }
+
+    const fullUrl = key.startsWith("http") ? key : `${BASE_URL}${key}`;
 
     const res = await fetch(fullUrl, {
       credentials: "include",
     });
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+    if (on401 === "returnNull" && res.status === 401) {
+      return null as unknown as T;
     }
 
     await throwIfResNotOk(res);
     return await res.json();
   };
+}
 
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
-      refetchInterval: false,
       refetchOnWindowFocus: false,
+      refetchInterval: false,
       staleTime: Infinity,
       retry: false,
     },
