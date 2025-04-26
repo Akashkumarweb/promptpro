@@ -55,7 +55,10 @@ app.use((req, res, next) => {
       log(logLine);
     }
   });
-  console.log("Origin:", req.headers.origin);
+  console.log("🔍 Request URL:", req.originalUrl);
+  console.log("🔐 Session ID:", req.sessionID);
+  console.log("📦 Session Data:", req.session);
+  console.log("👤 User:", req.user);
   next();
 });
 
