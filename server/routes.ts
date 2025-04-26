@@ -191,7 +191,6 @@ console.log("isAuthenticated:", req.isAuthenticated());
       }
       
       const validatedData = optimizePromptSchema.parse(req.body);
-      console.log("Request body to /api/optimize:", req.body);
       
       const { originalPrompt, audience, focusAreas } = validatedData;
       
