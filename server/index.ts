@@ -66,8 +66,10 @@ app.use((req, res, next) => {
   }
 
   // 🚪 Always run on port 5005
-  const port = 5005;
-  server.listen({ port, host: "0.0.0.0", reusePort: true }, () => {
-    log(`serving on port ${port}`);
-  });
+const port = process.env.PORT || 5005;
+
+
+server.listen({ port, host: "0.0.0.0" }, () => {
+  console.log(`Server running on port ${port}`);
+});
 })();
