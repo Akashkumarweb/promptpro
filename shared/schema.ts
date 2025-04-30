@@ -100,7 +100,7 @@ export const subscriptionSchema = z.object({
 export const optimizePromptSchema = z.object({
   originalPrompt: z.string().min(1, "Please enter a prompt"),
   audience: z.string().optional(),
-  focusAreas: z.array(z.string()).optional(),
+  focusAreas: z.array(z.enum(["specificity", "clarity", "ctas", "engagement"]))
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
