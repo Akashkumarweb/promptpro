@@ -46,7 +46,7 @@ export default function Signup() {
   const { signup, user, isLoading } = useAuth();
   const [, navigate] = useLocation();
   const [signupError, setSignupError] = useState<string | null>(null);
-  
+
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
@@ -70,7 +70,7 @@ export default function Signup() {
     setSignupError(null);
     // Omit confirmPassword before sending to API
     const { confirmPassword, ...signupData } = data;
-    
+
     const result = await signup(signupData);
     if (result) {
       navigate("/dashboard");
@@ -90,7 +90,7 @@ export default function Signup() {
             <span className="font-bold text-2xl text-slate-900 dark:text-white">PromptPal</span>
           </Link>
         </div>
-        
+
         <Card>
           <CardHeader>
             <CardTitle className="text-2xl">Sign up</CardTitle>
@@ -114,7 +114,7 @@ export default function Signup() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={form.control}
                   name="email"
@@ -128,7 +128,7 @@ export default function Signup() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={form.control}
                   name="displayName"
@@ -142,7 +142,7 @@ export default function Signup() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={form.control}
                   name="password"
@@ -156,7 +156,7 @@ export default function Signup() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={form.control}
                   name="confirmPassword"
@@ -170,11 +170,11 @@ export default function Signup() {
                     </FormItem>
                   )}
                 />
-                
+
                 {signupError && (
                   <div className="text-sm text-red-500 mt-2">{signupError}</div>
                 )}
-                
+
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? (
                     <>
